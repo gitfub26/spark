@@ -85,7 +85,7 @@
             flex: 1;
             text-align: center;
             padding: 8px 2px;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
             color: var(--text-primary);
             border-radius: 6px;
@@ -140,24 +140,26 @@
             transition: width 0.4s ease;
         }
 
-        .grid-container {
+        /* View routing wrappers */
+        .tab-content {
             display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+
+        .grid-container {
+            display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 12px;
             padding: 16px;
-            animation: fadeIn 0.3s ease;
         }
-        
-        .grid-container.active { display: grid; }
 
-        /* Unified Meat/Dairy Combo Container */
         .combo-container {
-            display: none;
-            padding: 16px;
-            animation: fadeIn 0.3s ease;
+            padding: 0 16px 24px 16px;
         }
-        
-        .combo-container.active { display: flex; }
 
         .combo-group {
             display: flex;
@@ -228,34 +230,38 @@
     </header>
 
     <div class="segmented-control" id="tabs">
-        <div class="segment active" data-target="grid-a" id="tab-a">
+        <div class="segment active" data-target="view-a" id="tab-a">
             Aisle A <div class="badge" id="badge-a">0</div>
         </div>
-        <div class="segment" data-target="grid-j" id="tab-j">
+        <div class="segment" data-target="view-j" id="tab-j">
             Aisle J <div class="badge" id="badge-j">0</div>
         </div>
-        <div class="segment" data-target="grid-g" id="tab-g">
+        <div class="segment" data-target="view-g" id="tab-g">
             Aisle G <div class="badge" id="badge-g">0</div>
-        </div>
-        <div class="segment" data-target="combo-diet" id="tab-diet">
-            Meat / Dairy <div class="badge" id="badge-diet">0</div>
         </div>
     </div>
 
-    <div id="grid-a" class="grid-container active"></div>
-    <div id="grid-j" class="grid-container"></div>
-    <div id="grid-g" class="grid-container"></div>
-    
-    <div id="combo-diet" class="combo-container">
-        <div class="combo-group" id="diet-group"></div>
+    <div id="view-a" class="tab-content active">
+        <div id="grid-a" class="grid-container"></div>
+        <div class="combo-container">
+            <div class="combo-group" id="diet-group"></div>
+        </div>
+    </div>
+
+    <div id="view-j" class="tab-content">
+        <div id="grid-j" class="grid-container"></div>
+    </div>
+
+    <div id="view-g" class="tab-content">
+        <div id="grid-g" class="grid-container"></div>
     </div>
 
     <script>
         const config = {
             a: { prefix: 'a', count: 31, container: 'grid-a', type: 'grid' },
+            diet: { items: ['meat', 'dairy'], container: 'diet-group', type: 'combo' },
             j: { prefix: 'j', count: 26, container: 'grid-j', type: 'grid' },
-            g: { prefix: 'g', count: 31, container: 'grid-g', type: 'grid' },
-            diet: { items: ['meat', 'dairy'], container: 'diet-group', type: 'combo' }
+            g: { prefix: 'g', count: 31, container: 'grid-g', type: 'grid' }
         };
 
         let state = JSON.parse(localStorage.getItem('trackerState')) || {};
@@ -301,24 +307,25 @@
 
         function updateUI() {
             let globalSelectedCount = 0;
-            const categoryCounts = { a: 0, j: 0, g: 0, diet: 0 };
+            const categoryCounts = { a: 0, j: 0, g: 0 };
 
-            // Tabulate state vectors
+            // Evaluate state vectors. Meat/Dairy are structurally bound to Aisle A's logic.
             Object.keys(state).forEach(key => {
                 if (state[key]) {
                     globalSelectedCount++;
-                    if (key.startsWith('a')) categoryCounts.a++;
-                    else if (key.startsWith('j')) categoryCounts.j++;
-                    else if (key.startsWith('g')) categoryCounts.g++;
-                    else if (key === 'meat' || key === 'dairy') categoryCounts.diet++;
+                    if (key.startsWith('a') || key === 'meat' || key === 'dairy') {
+                        categoryCounts.a++;
+                    } else if (key.startsWith('j')) {
+                        categoryCounts.j++;
+                    } else if (key.startsWith('g')) {
+                        categoryCounts.g++;
+                    }
                 }
             });
 
-            // Update Progress Bar
             const percentage = totalItems === 0 ? 0 : (globalSelectedCount / totalItems) * 100;
             document.getElementById('progressBar').style.width = `${percentage}%`;
 
-            // Update Badges and Tab Colors
             Object.keys(categoryCounts).forEach(cat => {
                 const count = categoryCounts[cat];
                 const badge = document.getElementById(`badge-${cat}`);
@@ -335,21 +342,20 @@
             });
         }
 
+        // Updated Reset Function: Bypasses the confirmation dialog
         document.getElementById('resetBtn').onclick = () => {
-            if(confirm('Erase all current selections?')) {
-                state = {};
-                saveState();
-                document.querySelectorAll('.item-btn, .combo-btn').forEach(btn => btn.classList.remove('selected'));
-                updateUI();
-            }
+            state = {};
+            saveState();
+            document.querySelectorAll('.item-btn, .combo-btn').forEach(btn => btn.classList.remove('selected'));
+            updateUI();
         };
 
-        // Tab Switching Logic
+        // Hierarchical Tab Routing
         document.querySelectorAll('.segment').forEach(segment => {
             segment.onclick = (e) => {
                 const target = e.currentTarget;
                 document.querySelectorAll('.segment').forEach(s => s.classList.remove('active'));
-                document.querySelectorAll('.grid-container, .combo-container').forEach(c => c.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 
                 target.classList.add('active');
                 document.getElementById(target.dataset.target).classList.add('active');
@@ -372,12 +378,10 @@
             applyTheme();
         };
 
-        // Initialization Pipeline
         renderDOM();
         applyTheme();
         updateUI();
 
-        // PWA Manifest and Service Worker Injection
         const manifest = {
             name: "Tracker",
             short_name: "Tracker",
@@ -389,7 +393,7 @@
         document.getElementById('manifest-placeholder').setAttribute('href', 'data:application/json;charset=utf-8,' + encodeURIComponent(manifestString));
 
         const swCode = `
-            const CACHE_NAME = 'tracker-offline-v2';
+            const CACHE_NAME = 'tracker-offline-v4';
             self.addEventListener('install', event => {
                 event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll([location.href])));
             });
